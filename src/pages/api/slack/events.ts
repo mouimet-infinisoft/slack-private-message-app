@@ -151,7 +151,7 @@ async function handleMessage(event: any) {
       await processPrivateMessage(event);
     } 
     // Handle channel messages that mention @ibrain
-    else if (text && text.includes('@ibrain')) {
+    else if (text && text.includes('ibrain')) {
       logVerbose('MENTION', `Processing mention in channel from ${user}`, { text, channel });
       await processChannelMention(event);
     }
