@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { WebClient } from '@slack/web-api';
 import crypto from 'crypto';
 import { Buffer } from 'buffer';
+import { togetherai } from '@ai-sdk/togetherai';
+import { generateText } from 'ai';
 
 // Initialize Slack client
 const slackToken = process.env.SLACK_BOT_TOKEN || '';
@@ -70,6 +72,53 @@ function verifySlackRequest(req: NextApiRequest): boolean {
   // For development, return true
   logVerbose('SECURITY', 'Development mode: skipping signature verification');
   return true;
+}
+
+// System prompt for the AI assistant
+const SYSTEM_PROMPT = `
+You are iBrain, a helpful and friendly AI assistant for a Slack workspace. 
+Your purpose is to assist users with their questions and requests.
+You respond in a concise, helpful, and friendly manner.
+You should always identify as iBrain and respond as if you are the bot itself, not a separate AI.
+When appropriate, you can use Slack formatting like *bold*, _italic_, and bullet points.
+Keep your responses brief and to the point, focusing on being helpful rather than verbose.
+`;
+
+// Generate AI response using Together AI with context
+async function generateAIResponse(userMessage: string, userName: string, isDM: boolean = true): Promise<string> {
+  try {
+    logVerbose('AI', 'Generating response with Together AI', { userMessage, userName, isDM });
+    
+    // Create specific prompt based on context
+    const contextPrompt = isDM ? 
+      `The user ${userName} has sent you a direct message: "${userMessage}"` : 
+      `The user ${userName} has mentioned you in a channel: "${userMessage}"`;
+    
+    const { text } = await generateText({
+      model: togetherai('meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'),
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: contextPrompt }
+      ]
+    });
+    
+    logVerbose('AI', 'Response generated successfully', { responseLength: text.length });
+    
+    // Format response to ensure proper user mention
+    if (isDM) {
+      // For DMs, we don't need to explicitly @ the user
+      return text;
+    } else {
+      // For channel mentions, ensure we @ the user
+      return text.includes(`<@${userName}>`) ? text : `<@${userName}> ${text}`;
+    }
+  } catch (error) {
+    const err = toErrorWithMessage(error);
+    logVerbose('ERROR', 'Failed to generate AI response', { error: err.message });
+    return isDM ? 
+      "I'm having trouble processing your request at the moment. Please try again later." :
+      `<@${userName}> I'm having trouble processing your request at the moment. Please try again later.`;
+  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -168,32 +217,29 @@ async function processPrivateMessage(event: any) {
   try {
     logVerbose('DM_PROCESS', 'Processing private message content', { text });
     
-    // Process based on message content
-    if (text.toLowerCase().includes('hello')) {
-      logVerbose('RESPONSE', 'Sending hello response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `Hello <@${user}>! How can I help you today?`,
-      });
-    } else if (text.toLowerCase().includes('help')) {
-      logVerbose('RESPONSE', 'Sending help response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `Here are some commands you can use:\n• *help* - Show available commands\n• *status* - Check system status\n• *info* - Get app information`,
-      });
-    } else {
-      // Default response
-      logVerbose('RESPONSE', 'Sending default response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `Thanks for your message. I'll process your request: "${text}"`,
-      });
-    }
+    // Generate a response treating the message as a direct communication
+    const aiResponse = await generateAIResponse(text, user, true);
+    
+    // Send the response
+    await slackClient.chat.postMessage({
+      channel: channel,
+      text: aiResponse,
+    });
     
     logVerbose('DM_PROCESS', 'Successfully processed private message');
   } catch (error) {
     const err = toErrorWithMessage(error);
     logVerbose('ERROR', 'Error processing private message', { error: err.message, stack: err.stack });
+    
+    // Send error message
+    try {
+      await slackClient.chat.postMessage({
+        channel: channel,
+        text: "I'm sorry, I encountered an error processing your message. Please try again later.",
+      });
+    } catch (sendError) {
+      logVerbose('ERROR', 'Failed to send error message', { error: sendError });
+    }
   }
 }
 
@@ -208,31 +254,28 @@ async function processChannelMention(event: any) {
     const cleanText = text.replace(/@ibrain/i, '').trim();
     logVerbose('MENTION_PROCESS', 'Cleaned message text', { originalText: text, cleanedText: cleanText });
     
-    // Process based on message content
-    if (cleanText.toLowerCase().includes('hello')) {
-      logVerbose('RESPONSE', 'Sending channel hello response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `Hello <@${user}>! I noticed you mentioned me in the channel. How can I help?`,
-      });
-    } else if (cleanText.toLowerCase().includes('help')) {
-      logVerbose('RESPONSE', 'Sending channel help response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `<@${user}> Here are some commands you can use:\n• *@ibrain help* - Show available commands\n• *@ibrain status* - Check system status\n• *@ibrain info* - Get app information`,
-      });
-    } else {
-      // Default response for channel mentions
-      logVerbose('RESPONSE', 'Sending default channel mention response');
-      await slackClient.chat.postMessage({
-        channel: channel,
-        text: `<@${user}> Thanks for mentioning me! I'll process your request: "${cleanText}"`,
-      });
-    }
+    // Generate a response treating the message as a channel mention
+    const aiResponse = await generateAIResponse(cleanText, user, false);
+    
+    // Send the response
+    await slackClient.chat.postMessage({
+      channel: channel,
+      text: aiResponse,
+    });
     
     logVerbose('MENTION_PROCESS', 'Successfully processed channel mention');
   } catch (error) {
     const err = toErrorWithMessage(error);
     logVerbose('ERROR', 'Error processing channel mention', { error: err.message, stack: err.stack });
+    
+    // Send error message
+    try {
+      await slackClient.chat.postMessage({
+        channel: channel,
+        text: `<@${user}> I'm sorry, I encountered an error processing your message. Please try again later.`,
+      });
+    } catch (sendError) {
+      logVerbose('ERROR', 'Failed to send error message', { error: sendError });
+    }
   }
 }
