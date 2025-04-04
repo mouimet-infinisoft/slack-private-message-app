@@ -1,5 +1,5 @@
 import { togetherai } from '@ai-sdk/togetherai';
-import { generateText, experimental_createMCPClient } from 'ai';
+import { generateText } from 'ai';
 import { logVerbose, toErrorWithMessage } from '../utils/slack';
 import { conversationManager } from './conversation';
 
@@ -13,16 +13,34 @@ When appropriate, you can use Slack formatting like *bold*, _italic_, and bullet
 Keep your responses brief and to the point, focusing on being helpful rather than verbose.
 `;
 
-// Class to handle MCP client errors
-class MCPClientManager {
-  handleUncaughtError(error: unknown, url: string) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logVerbose('MCP', `Error with MCP client at ${url}`, { error: errorMessage });
+// Function to fetch MCP tools from the Edge API route
+async function fetchMCPTools(): Promise<Record<string, any>> {
+  try {
+    // Determine the base URL based on environment
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? process.env.VERCEL_URL || ''
+      : 'http://localhost:3000';
+
+    // Make request to the Edge API route
+    const response = await fetch(`${baseUrl}/api/ai/tools`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch MCP tools: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.tools || {};
+  } catch (error) {
+    logVerbose('MCP', 'Failed to fetch MCP tools', { error: toErrorWithMessage(error).message });
+    return {};
   }
 }
-
-// MCP client manager instance
-const mcpManager = new MCPClientManager();
 
 // Generate AI response using Together AI with context
 export async function generateAIResponse(
@@ -62,25 +80,10 @@ export async function generateAIResponse(
     // Get the messages for the AI request
     const messages = conversationManager.getConversation(userId, contextType);
 
-    // Connect to MCP server and get tools
-    let mcpTools: Record<string, any> = {};
-    try {
-      const githubMCPUrl = process.env.GITHUB_MCP_URL || 'http://localhost:3001/github';
-      logVerbose('MCP', 'Connecting to MCP server', { url: githubMCPUrl });
-
-      // Create MCP client
-      const client = await experimental_createMCPClient({
-        transport: { type: "sse", url: githubMCPUrl },
-        onUncaughtError: (error) => mcpManager.handleUncaughtError(error, githubMCPUrl),
-      });
-
-      // Get available tools
-      mcpTools = await client.tools();
-      logVerbose('MCP', 'Retrieved MCP tools', { toolCount: Object.keys(mcpTools).length });
-    } catch (error) {
-      logVerbose('MCP', 'Failed to connect to MCP server', { error: toErrorWithMessage(error).message });
-      // Continue without tools if MCP server is unavailable
-    }
+    // Fetch MCP tools from the Edge API route
+    logVerbose('MCP', 'Fetching MCP tools from Edge API');
+    const mcpTools = await fetchMCPTools();
+    logVerbose('MCP', 'Retrieved MCP tools', { toolCount: Object.keys(mcpTools).length });
 
     // Generate response with Together AI
     const { text } = await generateText({

@@ -5,5 +5,10 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
-  ]
+  ],
+  "functions": {
+    "src/pages/api/ai/tools.ts": {
+      "runtime": "experimental-edge"
+    }
+  }
 }
