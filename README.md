@@ -10,7 +10,6 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 - Secure request verification with proper signature checking
 - AI-powered responses with conversation context
 - Integration with Model Context Protocol (MCP) for GitHub tools
-- Fallback AI provider for reliability
 - Rich message formatting with Block Kit
 - Comprehensive error handling and logging
 - Deployable on Vercel
@@ -28,7 +27,6 @@ A Slack application that handles private messages using TypeScript and Next.js, 
      - `SLACK_SIGNING_SECRET`: Your app signing secret
      - `SLACK_APP_TOKEN`: Your app-level token for Socket Mode (starts with `xapp-`)
      - `SLACK_BOT_USER_ID`: Your bot's user ID (for mention detection)
-     - `OPENAI_API_KEY`: Optional fallback AI provider
      - `GITHUB_MCP_URL`: URL for GitHub MCP server
 
 3. **Run the development server:**
@@ -108,8 +106,7 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 
 ### AI Integration
 
-- Primary AI provider: Together AI with Qwen/Qwen2.5-72B-Instruct-Turbo
-- Fallback provider: OpenAI (optional)
+- AI provider: Together AI with Qwen/Qwen2.5-72B-Instruct-Turbo
 - Conversation context management for better responses
 
 ### MCP Integration
