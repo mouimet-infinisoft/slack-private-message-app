@@ -5,7 +5,13 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 ## Features
 
 - Receives and processes private/direct messages in Slack
+- Handles channel mentions and thread replies
 - Supports both HTTP Events API and Socket Mode
+- Secure request verification with proper signature checking
+- AI-powered responses with conversation context
+- Fallback AI provider for reliability
+- Rich message formatting with Block Kit
+- Comprehensive error handling and logging
 - Deployable on Vercel
 
 ## Getting Started
@@ -16,10 +22,12 @@ A Slack application that handles private messages using TypeScript and Next.js, 
    ```
 
 2. **Set up environment variables:**
-   - Copy `.env.local` to `.env` and add your Slack tokens:
+   - Copy `.env.example` to `.env` and add your tokens:
      - `SLACK_BOT_TOKEN`: Your bot token (starts with `xoxb-`)
      - `SLACK_SIGNING_SECRET`: Your app signing secret
      - `SLACK_APP_TOKEN`: Your app-level token for Socket Mode (starts with `xapp-`)
+     - `SLACK_BOT_USER_ID`: Your bot's user ID (for mention detection)
+     - `OPENAI_API_KEY`: Optional fallback AI provider
 
 3. **Run the development server:**
    ```
@@ -49,13 +57,20 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 2. **Set up Event Subscriptions:**
    - For HTTP Events API:
      - Set Request URL to `https://your-vercel-app.vercel.app/api/slack/events`
-   - Subscribe to bot events: `message.im`
+   - Subscribe to bot events:
+     - `message.im` - For direct messages
+     - `app_mention` - For @mentions in channels
+     - `reaction_added` - For emoji reactions
+     - `app_home_opened` - For App Home interactions
 
 3. **OAuth & Permissions:**
    - Add bot scopes:
-     - `chat:write`
-     - `im:history`
-     - `im:read`
+     - `chat:write` - To send messages
+     - `im:history` - To read direct messages
+     - `im:read` - To access direct message channels
+     - `channels:history` - To read channel messages
+     - `reactions:read` - To read reactions
+     - `app_mentions:read` - To read @mentions
 
 ## Implementation Options
 
@@ -69,3 +84,36 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 - More efficient and secure (no public URLs needed)
 - Better for handling high volumes of events
 - Requires a separate process that stays running
+
+## Architecture
+
+### Code Structure
+
+- `src/pages/api/slack/events.ts` - Main API endpoint for Slack events
+- `src/pages/api/slack/config.ts` - Configuration for API routes
+- `src/types/slack.ts` - TypeScript interfaces for Slack events
+- `src/utils/slack.ts` - Utility functions for Slack integration
+- `src/services/conversation.ts` - Conversation context management
+- `src/services/ai.ts` - AI response generation
+- `src/services/slack.ts` - Slack event handling logic
+- `src/socket-mode-server.ts` - Socket Mode implementation
+
+### Security Features
+
+- Proper signature verification using raw request body
+- Timestamp validation to prevent replay attacks
+- Environment-based security controls
+
+### AI Integration
+
+- Primary AI provider: Together AI with Meta-Llama-3.1-8B-Instruct-Turbo
+- Fallback provider: OpenAI (optional)
+- Conversation context management for better responses
+
+### Testing
+
+Run tests with:
+
+```
+npm test
+```
