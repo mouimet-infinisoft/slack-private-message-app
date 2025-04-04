@@ -6,6 +6,24 @@ import { NextApiRequestWithRawBody } from './config';
 import { SlackEventPayload, SlackUrlVerificationPayload } from '../../../types/slack';
 import { logVerbose, toErrorWithMessage, verifySlackRequest } from '../../../utils/slack';
 
+// Simple in-memory cache for event deduplication
+// In production, consider using Redis or another distributed cache
+const processedEvents = new Map<string, number>();
+
+// Set expiration time for processed events (5 minutes)
+const EVENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// Clean up expired events every minute
+setInterval(() => {
+  const now = Date.now();
+  // Use forEach instead of for...of to avoid TypeScript iterator issues
+  processedEvents.forEach((timestamp, eventId) => {
+    if (now - timestamp > EVENT_CACHE_TTL) {
+      processedEvents.delete(eventId);
+    }
+  });
+}, 60 * 1000); // Run every minute
+
 // Import services
 import {
   handleMessage,
@@ -65,7 +83,22 @@ export default async function handler(req: NextApiRequestWithRawBody, res: NextA
 
     // Parse the event payload
     const eventPayload = body as SlackEventPayload;
-    logVerbose('EVENT', 'Processing Slack event', { eventType: eventPayload.event?.type });
+
+    // Check for duplicate events
+    if (eventPayload.event_id) {
+      if (processedEvents.has(eventPayload.event_id)) {
+        logVerbose('EVENT', 'Ignoring duplicate event', { eventId: eventPayload.event_id });
+        return res.status(200).json({ ok: true, duplicate: true });
+      }
+
+      // Mark this event as processed
+      processedEvents.set(eventPayload.event_id, Date.now());
+    }
+
+    logVerbose('EVENT', 'Processing Slack event', {
+      eventType: eventPayload.event?.type,
+      eventId: eventPayload.event_id
+    });
 
     // Process events
     if (eventPayload.event) {
