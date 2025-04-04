@@ -93,7 +93,7 @@ export async function generateAIResponse(
     try {
       return await withRetry(async () => {
         const { text } = await generateText({
-          model: togetherai('meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'),
+          model: togetherai('Qwen/Qwen2.5-72B-Instruct-Turbo'),
           messages: messages.map(m => ({ role: m.role, content: m.content })),
           tools: Object.keys(mcpTools).length > 0 ? mcpTools : undefined,
           toolChoice: Object.keys(mcpTools).length > 0 ? 'auto' : undefined

@@ -108,7 +108,7 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 
 ### AI Integration
 
-- Primary AI provider: Together AI with Meta-Llama-3.1-8B-Instruct-Turbo
+- Primary AI provider: Together AI with Qwen/Qwen2.5-72B-Instruct-Turbo
 - Fallback provider: OpenAI (optional)
 - Conversation context management for better responses
 
