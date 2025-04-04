@@ -9,6 +9,7 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 - Supports both HTTP Events API and Socket Mode
 - Secure request verification with proper signature checking
 - AI-powered responses with conversation context
+- Integration with Model Context Protocol (MCP) for GitHub tools
 - Fallback AI provider for reliability
 - Rich message formatting with Block Kit
 - Comprehensive error handling and logging
@@ -28,6 +29,7 @@ A Slack application that handles private messages using TypeScript and Next.js, 
      - `SLACK_APP_TOKEN`: Your app-level token for Socket Mode (starts with `xapp-`)
      - `SLACK_BOT_USER_ID`: Your bot's user ID (for mention detection)
      - `OPENAI_API_KEY`: Optional fallback AI provider
+     - `GITHUB_MCP_URL`: URL for GitHub MCP server
 
 3. **Run the development server:**
    ```
@@ -94,7 +96,7 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 - `src/types/slack.ts` - TypeScript interfaces for Slack events
 - `src/utils/slack.ts` - Utility functions for Slack integration
 - `src/services/conversation.ts` - Conversation context management
-- `src/services/ai.ts` - AI response generation
+- `src/services/ai.ts` - AI response generation with MCP integration
 - `src/services/slack.ts` - Slack event handling logic
 - `src/socket-mode-server.ts` - Socket Mode implementation
 
@@ -109,6 +111,14 @@ A Slack application that handles private messages using TypeScript and Next.js, 
 - Primary AI provider: Together AI with Meta-Llama-3.1-8B-Instruct-Turbo
 - Fallback provider: OpenAI (optional)
 - Conversation context management for better responses
+
+### MCP Integration
+
+- Integration with Model Context Protocol (MCP) for GitHub tools
+- Uses Vercel AI SDK's experimental_createMCPClient
+- Connects to GitHub MCP server via SSE transport
+- Provides LLM with access to GitHub repositories, issues, and more
+- Graceful fallback if MCP server is unavailable
 
 ### Testing
 
